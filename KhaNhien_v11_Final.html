@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-<title>Khả Nhiên - v12.2 (Simple Player Sprite)</title> 
+<title>Khả Nhiên - v12.1 (Function Order Fix)</title> 
 <style>
   :root {
     --bg: #1a1a2e;
@@ -77,7 +77,7 @@
   }
   canvas {
     display: block;
-    image-rendering: pixelated; /* Giữ độ sắc nét cho pixel art */
+    image-rendering: pixelated;
     width: 100%; 
     height: 100%;
   }
@@ -161,7 +161,7 @@
 <body>
 
   <div class="header">
-    <h1>Khả Nhiên's Birthday Dash 🎂 (v12.2)</h1>
+    <h1>Khả Nhiên's Birthday Dash 🎂 (v12.1)</h1>
     <div class="stats-bar">
       <span>Level: <strong id="levelCountUI">1/18</strong></span>
       <span>Ký ức: <strong><span id="collectCountUI">0/0</span></strong></span>
@@ -232,8 +232,8 @@ const levelSelect = document.getElementById('levelSelect');
 const bgMusic = document.getElementById('bgMusic'); 
 
 const COLORS = {
-  BG: '#0f172a', PLATFORM: '#16213e', PLAYER: '#ff8fb1', PLAYER_FEET: '#d16a8b', // Thêm màu chân
-  COLLECT: '#f7b801', HAZARD: '#e74c3c', ENEMY: '#ff4d4d', ENEMY_EYE: '#fff', // Thêm màu mắt Enemy
+  BG: '#0f172a', PLATFORM: '#16213e', PLAYER: '#ff8fb1', PLAYER_FEET: '#d16a8b',
+  COLLECT: '#f7b801', HAZARD: '#e74c3c', ENEMY: '#ff4d4d', ENEMY_EYE: '#fff',
   MOVING_PLATFORM: '#56ab91', SPRING: '#56cbf9', CHECKPOINT: '#f7b801',
   DOOR: '#a3a3a3', DOOR_PANEL: '#333', DOOR_LOCK: '#ffc300', KEY: '#ffc300', LAVA: '#ff4d4d' 
 };
@@ -643,6 +643,7 @@ function drawParticles() {
 }
 
 // ======== Level Parser (Giữ nguyên) ========
+// SỬA LỖI: Di chuyển parseLevel lên trước loadLevel
 function parseLevel(levelIndex) {
   platforms = [], collectibles = [], spikes = [], enemies = [], movingPlatforms = [], springs = [], checkpoints = [];
   doors = [], keyItems = [], lavas = [], hearts = []; 
@@ -738,9 +739,9 @@ function parseLevel(levelIndex) {
 }
 
 // ======== Player, Camera & Physics (Giữ nguyên) ========
-let initialPlayerStart = { x: TILE_SIZE*2, y: TILE_SIZE*10 }; 
 const player = {
-  x: initialPlayerStart.x, y: initialPlayerStart.y, width: 28, height: 28,
+  // SỬA LỖI: Sử dụng playerStart đã được định nghĩa ở trên
+  x: playerStart.x, y: playerStart.y, width: 28, height: 28, 
   drawWidth: 28, drawHeight: 28, speed: 4.5, vx: 0, vy: 0, 
   jumpStrength: 13.5, isOnGround: false, jumpsLeft: 2, 
   lives: 3, maxLives: 3, canDash: true, isDashing: false, dashTimer: 0, dashDir: 0,
@@ -811,6 +812,7 @@ function loadGame() {
   // Không reset mạng ở đây
   showStoryIntro(); 
 }
+// SỬA LỖI: Hàm loadLevel phải được định nghĩa sau parseLevel
 function loadLevel(index) {
   if (index >= TOTAL_LEVELS) {
     winGame(true); 
@@ -820,7 +822,7 @@ function loadLevel(index) {
   player.lives = player.maxLives; // Reset lives per level
   score = 0;
   gameWon = true; 
-  parseLevel(index);
+  parseLevel(index); // Bây giờ gọi parseLevel là hợp lệ
   resetPlayer(playerStart); 
   camera.x = 0; 
   updateUI();
@@ -1211,7 +1213,7 @@ function winGame(allLevelsComplete) {
   levelCompleteScreen.style.display = 'flex'; 
 }
 
-// ======== Draw Function (Cập nhật drawPlayer) ========
+// ======== Draw Function (Giữ nguyên) ========
 function draw() {
   const now = Date.now(); 
 
