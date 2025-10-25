@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Khả Nhiên - v12.2 (Simple Player Sprite)</title> 
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --player: #ff8fb1;
+    --text: #f7fbff;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden; 
+    background: var(--bg);
+    width: 100%;
+    height: 100%;
+  }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .header {
+    text-align: center;
+    padding: 10px;
+    width: 100%;
+    max-width: 800px; /* Giới hạn chiều rộng header */
+    flex-shrink: 0;
+    position: relative; 
+    z-index: 200; 
+  }
+  .header h1 {
+    margin: 0 0 5px 0;
+    color: var(--player);
+    font-size: 1.5em;
+  }
+  .stats-bar {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    font-size: 1.1em;
+    font-weight: bold;
+    flex-wrap: wrap; 
+    gap: 10px; 
+  }
+  #livesCountUI { color: #ff4d4d; font-size: 1.3em; }
+
+  /* Level Select Style */
+  #levelSelect {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 5px 8px;
+      border-radius: 5px;
+      font-size: 0.9em;
+  }
+  
+  .game-container {
+    position: relative; /* Needed for overlays */
+    width: 800px;
+    height: 600px;
+    max-width: 95vw; 
+    max-height: 80vh;
+    background: #0f172a;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    overflow: hidden; 
+    aspect-ratio: 800 / 600;
+    margin-top: 10px; 
+  }
+  canvas {
+    display: block;
+    image-rendering: pixelated; /* Giữ độ sắc nét cho pixel art */
+    width: 100%; 
+    height: 100%;
+  }
+  
+  /* Lớp phủ */
+  .overlay-screen {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(26, 26, 46, 0.9);
+    display: none; 
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  .overlay-screen h1 {
+    font-size: 2.5em;
+    color: #ffc300;
+    text-shadow: 0 0 15px #ffc300;
+    margin: 0;
+  }
+  .overlay-screen p { 
+    font-size: 1.2em; 
+    margin-top: 10px; 
+    max-width: 90%;
+  }
+  .btn {
+    font-size: 1.1em;
+    font-weight: bold;
+    color: #fff;
+    background: linear-gradient(90deg, #ff8fb1, #7b6bff);
+    border: none;
+    padding: 12px 25px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: transform 0.2s ease;
+  }
+  .btn:hover { transform: scale(1.05); }
+  .btn.secondary { background: #334; }
+
+  /* Nút cảm ứng */
+  #touch-controls {
+    position: fixed;
+    bottom: 20px;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    z-index: 50;
+    pointer-events: none; 
+  }
+  .touch-group {
+    display: flex;
+    gap: 15px;
+    pointer-events: auto; 
+  }
+  .touch-group.left { margin-left: 30px; }
+  .touch-group.right { margin-right: 30px; }
+  .touch-btn {
+    width: 60px;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    color: white;
+    font-size: 1.5em;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none; 
+  }
+  .touch-btn.jump { width: 70px; height: 70px; }
+  .touch-btn.dash { background: rgba(255, 143, 177, 0.3); }
+</style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>Khả Nhiên's Birthday Dash 🎂 (v12.2)</h1>
+    <div class="stats-bar">
+      <span>Level: <strong id="levelCountUI">1/18</strong></span>
+      <span>Ký ức: <strong><span id="collectCountUI">0/0</span></strong></span>
+      <span>Mạng: <strong id="livesCountUI">❤️❤️❤️</strong></span>
+      <span>
+          Chọn màn: 
+          <select id="levelSelect"></select>
+      </span>
+    </div>
+  </div>
+
+  <div class="game-container">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    
+    <div id="storyScreen" class="overlay-screen">
+      <h1>Hành Trình Tuổi 18</h1>
+      <p>Ôi không! 18 quả bong bóng 🎈 tượng trưng cho 18 năm ký ức của Nhiên đã bị gió thổi bay đi mất! Bạn hãy giúp Nhiên thu thập lại tất cả để bắt đầu bữa tiệc sinh nhật nhé!</p>
+      <button id="startBtn" class="btn">Bắt đầu Hành Trình</button>
+    </div>
+
+    <div id="levelIntroScreen" class="overlay-screen">
+      <h1 id="levelIntroTitle">Tuổi 1</h1>
+      <p id="levelIntroText">Ký ức đầu tiên... bập bẹ tập đi!</p>
+      <button id="playLevelBtn" class="btn">Chơi</button>
+    </div>
+
+    <div id="levelCompleteScreen" class="overlay-screen">
+      <h1 id="winTitle">Hoàn Thành Level!</h1>
+      <p id="winMessage">Chúc mừng tuổi mới!</p>
+      <button id="nextLevelBtn" class="btn">Level Tiếp Theo</button>
+      <button id="restartBtn" class="btn secondary">Chơi lại</button>
+    </div>
+  </div>
+
+  <audio id="bgMusic" src="retro-8bit-happy-videogame-music-418481.mp3" loop></audio> 
+
+  <div id="touch-controls">
+    <div class="touch-group left">
+      <div class="touch-btn" id="touch-left">◀</div>
+      <div class="touch-btn" id="touch-right">▶</div>
+    </div>
+    <div class="touch-group right">
+      <div class="touch-btn dash" id="touch-dash">🔲</div>
+      <div class="touch-btn jump" id="touch-jump">▲</div>
+    </div>
+  </div>
+
+<script>
+// ======== Setup Canvas & Audio ========
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+// (Các biến UI)
+const levelCompleteScreen = document.getElementById('levelCompleteScreen');
+const nextLevelBtn = document.getElementById('nextLevelBtn');
+const restartBtn = document.getElementById('restartBtn');
+const collectCountUI = document.getElementById('collectCountUI');
+const levelCountUI = document.getElementById('levelCountUI');
+const livesCountUI = document.getElementById('livesCountUI');
+const winTitle = document.getElementById('winTitle');
+const winMessage = document.getElementById('winMessage');
+const storyScreen = document.getElementById('storyScreen');
+const startBtn = document.getElementById('startBtn');
+const levelIntroScreen = document.getElementById('levelIntroScreen');
+const levelIntroTitle = document.getElementById('levelIntroTitle');
+const levelIntroText = document.getElementById('levelIntroText');
+const playLevelBtn = document.getElementById('playLevelBtn');
+const levelSelect = document.getElementById('levelSelect'); 
+const bgMusic = document.getElementById('bgMusic'); 
+
+const COLORS = {
+  BG: '#0f172a', PLATFORM: '#16213e', PLAYER: '#ff8fb1', PLAYER_FEET: '#d16a8b', // Thêm màu chân
+  COLLECT: '#f7b801', HAZARD: '#e74c3c', ENEMY: '#ff4d4d', ENEMY_EYE: '#fff', // Thêm màu mắt Enemy
+  MOVING_PLATFORM: '#56ab91', SPRING: '#56cbf9', CHECKPOINT: '#f7b801',
+  DOOR: '#a3a3a3', DOOR_PANEL: '#333', DOOR_LOCK: '#ffc300', KEY: '#ffc300', LAVA: '#ff4d4d' 
+};
+
+let audioCtx = null;
+let musicStarted = false; 
+function ensureAudio() { 
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); 
+    audioCtx.resume(); 
+    if (!musicStarted && bgMusic.src && bgMusic.src.includes('mp3') ) { 
+        bgMusic.volume = 0.3; 
+        bgMusic.play().catch(e => console.log("Autoplay failed, user interaction needed.")); 
+        musicStarted = true;
+    }
+}
+// (Hàm playSound... giữ nguyên)
+function playSound(type) {
+  if (!audioCtx) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.connect(g); g.connect(audioCtx.destination);
+  g.gain.setValueAtTime(0, audioCtx.currentTime);
+  g.gain.linearRampToValueAtTime(0.05, audioCtx.currentTime + 0.01);
+  if (type === 'jump') { o.type = 'triangle'; o.frequency.value = 880; g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.3);
+  } else if (type === 'collect') { o.type = 'sine'; o.frequency.value = 1046; g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.2);
+  } else if (type === 'hit') { o.type = 'sawtooth'; o.frequency.value = 330; o.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.15); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.15);
+  } else if (type === 'stomp') { o.type = 'square'; o.frequency.value = 660; g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.2);
+  } else if (type === 'dash') { o.type = 'sawtooth'; o.frequency.value = 1200; g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.1); 
+  } else if (type === 'powerup') { o.type = 'triangle'; o.frequency.value = 1318; g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5); 
+  } else if (type === 'open') { o.type = 'sine'; o.frequency.value = 784; g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4); 
+  } else if (type === 'wallslide') { o.type = 'sine'; o.frequency.value = 220; g.gain.setValueAtTime(0.01, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1); 
+  } else if (type === 'walljump') { o.type = 'triangle'; o.frequency.value = 988; g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.3); 
+  } else if (type === 'win') { o.type = 'triangle'; o.frequency.value = 523; g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.0);
+    setTimeout(() => { const o2 = audioCtx.createOscillator(), g2 = audioCtx.createGain(); o2.connect(g2); g2.connect(audioCtx.destination); o2.type = 'triangle'; o2.frequency.value = 659; g2.gain.setValueAtTime(0.05, audioCtx.currentTime); g2.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.8); o2.start(); o2.stop(audioCtx.currentTime + 0.8); }, 200);
+  }
+  o.start(); o.stop(audioCtx.currentTime + 0.5);
+}
+
+// ======== 18 Lời Chúc (Phiên bản Tình bạn) ========
+const STORY_DATA = [
+  "Tuổi 1: Chặng đường đầu tiên! Chúc bạn tuổi mới luôn vui vẻ, an nhiên. (Cẩn thận, đừng rơi xuống 'dung nham' LAVA nhé!)", // Level 1
+  "Tuổi 2: Tuổi tập nói bi bô. Chúc bạn luôn tò mò khám phá thế giới. (Hãy tìm 'chìa khóa' Y để mở 'cánh cửa' D!)", // Level 2
+  "Tuổi 3: Lần đầu đi mẫu giáo. Chúc bạn tuổi mới luôn dũng cảm và có nhiều bạn tốt! (Tìm 'trái tim' H sẽ giúp bạn an toàn hơn!)", // Level 3
+  "Tuổi 4: Năng động hơn rồi! Chúc bạn luôn khám phá thế giới với thật nhiều năng lượng. (Bạn có thể Nhảy Đúp!)", // Level 4
+  "Tuổi 5: Tuổi tinh nghịch. Chúc bạn có một tuổi thơ thật đẹp và đáng nhớ. (Coi chừng! Hãy dẫm lên kẻ thù!)", // Level 5
+  "Tuổi 6: Vào lớp 1! Một hành trình mới. Chúc bạn học thật tốt và luôn là niềm tự hào của gia đình.", // Level 6
+  "Tuổi 7: Bắt đầu thích leo trèo! Chúc bạn luôn giữ được sự hồn nhiên, vui tươi. (Hãy thử bám vào tường xem!)", // Level 7
+  "Tuổi 8: Kiên trì. Chúc bạn mọi khó khăn đều vượt qua, như cách bạn bật cao trên lò xo 'B' này!", // Level 8
+  "Tuổi 9: Mạnh mẽ. Chúc bạn luôn là một người mạnh mẽ, kiên định với mục tiêu của mình.", // Level 9
+  "Tuổi 10: Dấu mốc đầu tiên! Chúc bạn luôn nhanh nhẹn và thông minh. (Hãy dùng cú lướt - 🔲!)", // Level 10
+  "Tuổi 11: Thông minh và sáng tạo. Chúc bạn luôn tìm được đường đi của riêng mình.", // Level 11
+  "Tuổi 12: Bền bỉ. Chặng đường có thể khó, nhưng đừng bỏ cuộc nhé!", // Level 12
+  "Tuổi 13: Đột phá. Một giai đoạn mới để khám phá bản thân. Chúc bạn mọi điều thuận lợi.", // Level 13
+  "Tuổi 14: Hy vọng. Chúc bạn luôn tin vào một tương lai tươi sáng. (Checkpoint 'K' sẽ giúp bạn!)", // Level 14
+  "Tuổi 15: Tự tin. Chúc bạn luôn tự tin và tỏa sáng theo cách của riêng mình!", // Level 15
+  "Tuổi 16: Trưởng thành. Bắt đầu những suy nghĩ chín chắn hơn. Chúc bạn luôn vững vàng.", // Level 16
+  "Tuổi 17: Bản lĩnh. Gần đến đích rồi! Chúc bạn thi tốt và đạt được mọi nguyện vọng của mình!", // Level 17
+  "Tuổi 18: CHÚC MỪNG SINH NHẬT! Một cột mốc quan trọng! Chúc bạn một hành trình mới thật rực rỡ! Bữa tiệc đang chờ!" // Level 18
+];
+
+// ======== Level Design (18 Levels Hoàn Chỉnh) ========
+const TILE_SIZE = 40;
+// ?: Ô có thể ngẫu nhiên là Floor, Spike, hoặc Spring
+const LEVEL_MAP_1 = [ 
+  "                                        ",
+  "                                        ",
+  "   C                C                   ",
+  "  PPPP             PPPP                 ",
+  "        ?                               ", 
+  "     C                                  ",
+  "    PPPP   PPPPP                        ",
+  "           ?                            ", 
+  "           S      C                     ",
+  "  @ K   PPPPP ?? PPPP                   ", 
+  " PPPP S S                               ",
+  "    C     S           G                 ",
+  "   PPPP  PPPPP P      PPPP              ",
+  "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL" 
+];
+const LEVEL_MAP_2 = [ 
+  "                                              ", 
+  "                                              ",
+  "    C                 ?                       ",
+  "   PPP               PPP                      ",
+  "                         C                    ",
+  "             E Y        PPP                   ", 
+  "            PPPPP      ?                      ",
+  "                                              ",
+  "     K          C                             ", 
+  "    PPPP       PPP    ?                       ",
+  "                                        D G   ", 
+  "  @      ?            B PPPP           PPPP   ",
+  " PPPP      PPPPPP     S                       ",
+  " SSSSS     C             M-------------M      ", 
+  "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
+];
+const LEVEL_MAP_3 = [ 
+  "                                                            ", 
+  "                                                            ",
+  "                                C         P                 ",
+  "                              ?P          P                 ",
+  "  @   C             C      PPPP           P                 ", 
+  " PPPP PPP          PPPP                 S P                 ",
+  "            E                           P                   ",
+  "     H     PPPPP   ?    S    S          P     E             ", 
+  "    PPP               PPPPP  PPPPP     P    PPPPP            ",
+  "                                       P ?                  ",
+  "                       E               K                    ", 
+  "                      PPPPP            PPPPPP               ",
+  "                               M---------M        D G       ",
+  "   C      Y    S S S S S S S S S                  PPPP      ", 
+  "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL"
+];
+const LEVEL_MAP_4 = [ // Double Jump Focus
+    "                                      ",
+    "                                      ",
+    " @ C                                  ",
+    " PPPPP                                ",
+    "                                      ",
+    "             C                        ",
+    "            PPPPP                     ",
+    "                                      ",
+    "                         C            ",
+    "                        PPPPP         ",
+    "                                      ",
+    "            ?????        K            ",
+    "           PPPPPPP      PPPP          ",
+    "   C                S           G     ",
+    " PPPPP             PPP         PPPP   ",
+    "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
+];
+const LEVEL_MAP_5 = [ // Stomping Focus
+    "                                          ",
+    "                                          ",
+    " @ C                                      ",
+    " PPPP                                     ",
+    "                                          ",
+    "       E       C      E                   ",
+    "      PPPPP   PPPP   PPPPP                ",
+    "                                          ",
+    "                    ?   C                 ",
+    "                   PPP PPP                ",
+    "                                          ",
+    "         K                E               ",
+    "        PPPP            PPPPP             ",
+    "    S           S                   G     ",
+    "   PPP         PPP C               PPPP   ",
+    "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
+];
+const LEVEL_MAP_6 = [ // Dash Intro
+    "                                                  ",
+    "                                                  ",
+    " @ C                                              ",
+    " PPPPP                                            ",
+    "                                                  ",
+    "                C                                 ",
+    " PPPPPPPPPPPPP     PPPPPPPPPPPPPPPPPPP            ", // Long Gap
+    "                                                  ",
+    "                           C                      ",
+    "                          PPP                     ",
+    "                                                  ",
+    "         K             ??????         E           ",
+    "        PPPP          PPPPPPPP       PPPPP        ",
+    "                S S                           G   ",
+    "   C           PPPPPP         C              PPPP ",
+    "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
+];
+const LEVEL_MAP_7 = [ // Wall Slide/Jump Intro
+    "P             P             P                   P",
+    "P C           P C           P                   P",
+    "P   @         P             P         C         P",
+    "P  PPP        P PPP         P PPP     PPP       P",
+    "P             P             P                   P",
+    "P             P             P                   P",
+    "P S           P S           P S                 P",
+    "PPPPPPP       PPPPPPP       PPPPPPP             P",
+    "      P             P             P             P",
+    "      P C           P C           P             P",
+    "      P             P             P   K         P",
+    "      P PPP         P PPP         P PPP         P",
+    "      P             P             P             P",
+    "      P             P             P   G         P",
+    "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
+];
+const LEVEL_MAP_8 = [ // Springs
+    "                                                  ",
+    "              C                                   ",
+    "             PPP                                  ",
+    "                                                  ",
+    "                            C                     ",
+    "                           PPP                    ",
+    "                                                  ",
+    "                                                  ",
+    " @     B           B            B           G     ",
+    "PPPP   PPPP       PPPP         PPPP       PPPP     ",
+    "   P C P   P     P K  P       P    P     P C  P    ",
+    "   PPPPP   P     PPPPPP       PPPPPP     PPPPPP    ",
+    "           P          P            P           P   ",
+    " S         P S        P S          P S         P S ",
+    "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
+];
+const LEVEL_MAP_9 = [ // Dash Attack
+    "                                                  ",
+    "                                                  ",
+    " @  C                                             ",
+    " PPPPP      PPPPPP                                ",
+    "           S  E  S                                ",
+    "          PPPPPPPP                                ",
+    "                                                  ",
+    "                 C       H           C      G     ", // Heart for safety
+    " PPPPPPPPPPPPPP         PPP       PPPPPPPPPPPPPPPP",
+    "               P                  P               ",
+    "               P   E       E      P               ",
+    "               P  PPPPP   PPPPP   P K             ",
+    "               P                  P               ",
+    "               P    S S S S S     P               ",
+    "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
+];
+const LEVEL_MAP_10 = [ // Moving Platforms & Speed
+    "                                                            ",
+    "                                                            ",
+    " @ C                                                        ",
+    " PPPP                                                       ",
+    "                                                            ",
+    "      M---------M         C         M---------M             ",
+    "                                                            ",
+    "                      PPPPP E PPPPP                         ",
+    "                                                            ",
+    "                                                            ",
+    " K           M------------M           C                     ",
+    "PPPP                                PPPPP                   ",
+    "    S S S                                S S S              ",
+    "                                                      G     ",
+    "        C    M--------------------M C                PPPP   ",
+    "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
+];
+const LEVEL_MAP_11 = [ // Key/Door Puzzle
+    "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP",
+    "P @       P   C   P       P   Y P           P        P",
+    "P P PPPPP P PPPPP P PPP PPP PPP P PPPPP PPP P PPPPPP P",
+    "P P P     P P   P P P P P     P   P   P P P P P    P P",
+    "P   P PPP P P C P   P P PPP PPP P P PPP P P P P C  P P",
+    "P PPP P P P PPP P PPP P P   P P P P P P P P   P PP P P",
+    "P P   P P   P C P P   P P P P P P P P P P PPP P P  P P",
+    "P P PPP PPP P PPP P PPP P P PPP P P P P P P   P PK P P",
+    "P P P   P P P     P P     P P   P P P P P PPP P PP P P",
+    "P P P C P P PPPPPPP P PPPPPPP PPP P P P P P     P    P",
+    "P P PPP P P         P             P P P P PPPPPPPPPP P",
+    "P P     P PPPPPPPPPPP PPPPPPPPPPP PPP P P            P",
+    "P PPPPPPP P           P       P     P P PPPPPPPPPP P P",
+    "P C         E         P       P   E P D G          C P",
+    "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
+];
+const LEVEL_MAP_12 = [ // Lava Challenge
+    "                                                            ",
+    " @ C          Y                                             ",
+    " PPPP       PPPP                                            ",
+    "           L    L                                           ",
+    "          P      P                                          ",
+    "        CL        LC                                        ",
+    "       P            P                                       ",
+    "      P              P     K                                ",
+    "     PL              LP   PPPP                              ",
+    "    P                  P          C                         ",
+    "   P                    P        PPP                        ",
+    "  PL                    LP              M-------------M     ",
+    " P                        P                                 ",
+    "P C                        P   L   L   L   L   L   L  D G   ", 
+    "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP",
+    "LLLLLLLLLLLLLLLLLLLLLLLLLLLL LLLL LLLLLLLLLLLLLLLLLLLLLLLLLL", 
+    "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL" 
+];
+const LEVEL_MAP_13 = [ // Verticality/Wall Jump Mastery
+    "P               P               P               P",
+    "P               P               P               P",
+    "P               P               P               P",
+    "P C             P C             P C             P",
+    "P PPP           P PPP           P PPP           P",
+    "P   P           P   P           P   P           P",
+    "P   P           P   P           P   P           P",
+    "P   PPPPPPP     P   PPPPPPP     P   PPPPPPP     P",
+    "P         P     P         P     P         P     P",
+    "P         P     P         P     P         P     P",
+    "P         P     P         P     P         P     P",
+    "P C       P     P C       P     P C       P     P",
+    "P PPP     P     P PPP     P     P PPP     P K G P",
+    "P   @     P     P         P     P         P PPP P",
+    "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
+];
+const LEVEL_MAP_14 = [ // Checkpoints/Difficulty Spike (v11.4 - Key Fix)
+    "                                                                    ", 
+    "                                                                    ",
+    " @ C    PPPP     C    PPPP     C    PPPP     C    PPPP             ",
+    " PPPP   LLLL    PPPP   LLLL    PPPP   LLLL    PPPP   LLLL     D G     ", 
+    "       ?    ?        ?    ?        ?    ?        ?    ?    PPPP    ",
+    "                                                                    ",
+    "      M-------M             K             M---------M             ", 
+    "                                                                    ",
+    " PPPP    E    PPPP       PPPP     E     PPPP       PPPP    E    PPPP",
+    " SSSS   PPP   SSSS       SSSS    PPP    SSSS       SSSS   PPP   SSSS",
+    "                                                                    ",
+    "           C                 H C         P Y P      K           C       ", 
+    "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP",
+    " LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL ", 
+    "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
+];
+const LEVEL_MAP_15 = [ // Skill Combination
+    "P             P                             P             P",
+    "P             P                             P             P",
+    "P @           P                             P           C P",
+    "P PPP         P                             P PPP       PPP",
+    "P   P         P                             P   P         P",
+    "P   P         P                             P   P         P", // Wall jump up
+    "P C PPP       P                             P   PPPPPPPPP P",
+    "P PPP P       PPPPPPPPPPPPPPPPPPPPPPPPPPPPP P             P", // Long dash
+    "P     P                                   P K             P",
+    "PPPPPPP                                   P PPP           P",
+    "                                          P   P           P",
+    "          B        E          B           P   P       C   P", // Spring + enemy
+    "         PPPP     PPPPP      PPPP         P   P      PPPP P",
+    "    S S                                   P   S S S     G P",
+    "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
+];
+const LEVEL_MAP_16 = [ // Precision Platforming
+    "                                                              ",
+    "                                                              ",
+    " @ C P P P C P P P C P P P C P P P C K P P P C P P P C P D G ", // Small platforms
+    " PPPP L P L P L P L P L P L P L P L PPPP L P L P L P L P PPPP", // Lava under
+    "                                                              ",
+    "       P         P         P         P         P         P    ",
+    "     M-M       M-M       M-M       M-M       M-M       M-M  ", // Moving platforms below
+    "   C         C         C         C         C         C      ",
+    "                                                              ",
+    " P               P               P               P            ",
+    " P E             P E             P E             P E          ",
+    " PPPP            PPPP            PPPP            PPPP         ",
+    "                                                              ",
+    "         Y                                                    ", // Key needed
+    "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
+];
+const LEVEL_MAP_17 = [ // Endurance
+    "P                                                       P G D P", // Long level
+    "P @ C PPP                                                 P P P",
+    "P PPPP  P                                                 P P P",
+    "P       P   PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP       P P P",
+    "P       P C P                                   P       P P P",
+    "P       PPPP P      E       PPPPPP      E       P       P P P",
+    "P          P P     PPP     P      P    PPP     P       P P P",
+    "P K        P P SSS SSS PPPP      PPPP SSS SSS P       P P P",
+    "P PPPPP    P P P       P             P       P P       P P P",
+    "P       P  P P P C     PPPPPPPPP     P     C P P       P P P",
+    "P       P  P P P       P       P     P       P P       P P P",
+    "P PPPPPPP  P P PPPPPPPPP   K   PPPPPPPPPPP PPP P       P P P", // Mid Checkpoint
+    "P P        P P             PPP             P   P       P P P",
+    "P P      C P P   M---------------------M   P C P       P Y P", // Key near end
+    "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
+];
+const LEVEL_MAP_18 = [ // Final Challenge/Celebration
+    "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP",
+    "P @                                                G P", // Simple start/end
+    "P P                                                P P",
+    "P P                                                P P",
+    "P P                                                P P",
+    "P P         PPPPPPPPP       PPPPPPPPP            C P P", // P for Party?
+    "P P         P         P     P         P            P P",
+    "P P         P   PPP   P     P   PPP   P            P P",
+    "P P         P   P C P P     P   P C P P     K      P P",
+    "P P         P   PPP   P     P   PPP   P    PPP     P P",
+    "P P         P         P     P         P            P P",
+    "P P         PPPPPPPPP       PPPPPPPPP            H P P", // Heart!
+    "P P                                                P P",
+    "P P   B   S    E    S    B    S    E   S    B    C P P", // Final obstacle course
+    "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
+];
+
+// Combine all level maps
+const ALL_LEVELS = [
+    LEVEL_MAP_1, LEVEL_MAP_2, LEVEL_MAP_3, LEVEL_MAP_4, LEVEL_MAP_5,
+    LEVEL_MAP_6, LEVEL_MAP_7, LEVEL_MAP_8, LEVEL_MAP_9, LEVEL_MAP_10,
+    LEVEL_MAP_11, LEVEL_MAP_12, LEVEL_MAP_13, LEVEL_MAP_14, LEVEL_MAP_15,
+    LEVEL_MAP_16, LEVEL_MAP_17, LEVEL_MAP_18
+];
+const TOTAL_LEVELS = ALL_LEVELS.length; // Should be 18
+
+// (Các biến và hàm còn lại giữ nguyên)
+// ... (Game Objects, Particle System, Level Parser, Player, Camera, Physics, Controls, Game Flow, Update, Draw, etc.) ...
+// Game Objects
+let platforms = [], collectibles = [], spikes = [], enemies = [], movingPlatforms = [], springs = [], checkpoints = [];
+let doors = [], keyItems = [], lavas = [], hearts = []; 
+let goal = null; 
+let playerStart = { x: TILE_SIZE*2, y: TILE_SIZE*10 }; // Default playerStart
+
+let targetScore = 0, levelWidth = 0, levelHeight = 0, lastCheckpointPos = null;
+let particles = [];
+// (Các hàm spawn/update/draw Particles giữ nguyên)
+function spawnParticles(x, y, count, color, speed = 3) {
+  for (let i = 0; i < count; i++) { particles.push({ x, y, vx: (Math.random() - 0.5) * speed * 2, vy: (Math.random() - 0.5) * speed * 2 - 1, life: Math.random() * 30 + 20, color }); }
+}
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.1; p.life--;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+function drawParticles() {
+  for (const p of particles) { ctx.fillStyle = p.color; ctx.globalAlpha = p.life / 30.0; ctx.fillRect(p.x, p.y, 3, 3); }
+  ctx.globalAlpha = 1.0;
+}
+
+// ======== Level Parser (Giữ nguyên) ========
+function parseLevel(levelIndex) {
+  platforms = [], collectibles = [], spikes = [], enemies = [], movingPlatforms = [], springs = [], checkpoints = [];
+  doors = [], keyItems = [], lavas = [], hearts = []; 
+  goal = null, targetScore = 0, particles = [], lastCheckpointPos = null;
+  player.hasKey = false; 
+
+  const map = ALL_LEVELS[levelIndex];
+  const ROWS = map.length;
+  const COLS = map[0].length;
+  levelWidth = COLS * TILE_SIZE;
+  levelHeight = ROWS * TILE_SIZE;
+
+  // Pre-parse map into a simple grid
+  const tempGrid = Array.from({ length: ROWS }, () => Array(COLS).fill(0)); // 0 = floor
+  for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+          const char = map[r]?.[c] ?? ' '; // Handle potential out-of-bounds
+          if (char === 'P' || char === 'D' || char === 'M') tempGrid[r][c] = 1; 
+          else if (char === 'L') tempGrid[r][c] = 2; 
+          else if (char === 'S') tempGrid[r][c] = 3; 
+          else if (char === '?') tempGrid[r][c] = 4; // Mark randomizable
+      }
+  }
+  function isFloor(r, c) {
+      if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return false;
+      // Check the potentially randomized state in tempGrid
+      return tempGrid[r][c] === 0 || tempGrid[r][c] === 4; // Treat unrandomized '?' as floor for placement
+  }
+
+
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const char = map[r][c];
+      const x = c * TILE_SIZE; const y = r * TILE_SIZE;
+      
+      // Randomize '?' tiles FIRST
+      if (char === '?') {
+          const rand = Math.random();
+          if (rand < 0.1) { // 10% chance Spike
+              spikes.push({ x, y });
+              tempGrid[r][c] = 3; // Update tempGrid
+          } else if (rand < 0.15) { // 5% chance Spring
+              springs.push({ x, y: y + TILE_SIZE/2, width: TILE_SIZE, height: TILE_SIZE/2 });
+              // Mark as not floor for collectible placement? Maybe not needed.
+              tempGrid[r][c] = 5; // Use 5 for Spring base
+          } else {
+              tempGrid[r][c] = 0; // It becomes floor
+          }
+          continue; 
+      }
+      
+      // Place other objects
+      if (char === 'P') { platforms.push({ x, y, width: TILE_SIZE, height: TILE_SIZE });
+      } else if (char === 'C') { 
+          // Randomize Collectible position slightly
+          let placed = false;
+          for (let tries = 0; tries < 5; tries++) { 
+              const randR = r + Math.floor(Math.random() * 3) - 1; 
+              const randC = c + Math.floor(Math.random() * 3) - 1; 
+              // Use the isFloor check which now considers the final state of '?'
+              if(isFloor(randR, randC) && tempGrid[randR]?.[randC] !== 5 ) { // Ensure it's floor and not a spring base
+                   collectibles.push({ x: randC * TILE_SIZE + TILE_SIZE / 2, y: randR * TILE_SIZE + TILE_SIZE / 2, radius: 10, collected: false });
+                   placed = true;
+                   break; 
+              }
+          }
+          if (!placed) { collectibles.push({ x: x + TILE_SIZE / 2, y: y + TILE_SIZE / 2, radius: 10, collected: false }); }
+          targetScore++;
+      } else if (char === 'S') { spikes.push({ x, y });
+      } else if (char === 'G') { goal = { x, y };
+      } else if (char === '@') { playerStart = { x: x, y: y + TILE_SIZE - 28 }; // Use map position directly
+      } else if (char === 'E') { 
+          // Randomize enemy start slightly
+          const startXOffset = (Math.random() - 0.5) * TILE_SIZE * 0.5; 
+          enemies.push({ x: x + startXOffset, y: y + TILE_SIZE - 28, width: 28, height: 28, vx: 1, startX: x + startXOffset, range: 60, dead: false, deadTimer: 0 });
+      } else if (char === 'B') { springs.push({ x, y: y + TILE_SIZE/2, width: TILE_SIZE, height: TILE_SIZE/2 });
+      } else if (char === 'K') { checkpoints.push({ x, y, width: TILE_SIZE, height: TILE_SIZE, activated: false }); 
+      } else if (char === 'Y') { keyItems.push({ x, y, width: TILE_SIZE, height: TILE_SIZE, collected: false }); 
+      } else if (char === 'D') { doors.push({ x, y, width: TILE_SIZE, height: TILE_SIZE }); 
+      } else if (char === 'L') { lavas.push({ x, y: y + TILE_SIZE/2, width: TILE_SIZE, height: TILE_SIZE/2 }); 
+      } else if (char === 'H') { hearts.push({ x: x + TILE_SIZE/2, y: y + TILE_SIZE/2, radius: 12, collected: false }); 
+      } else if (char === 'M') {
+        let endC = c;
+        while(r < map.length && c < map[r].length && map[r][endC+1] === '-') endC++; 
+        const range = (endC - c) * TILE_SIZE;
+        // Randomize moving platform start slightly
+        const startXOffset = (Math.random() - 0.5) * TILE_SIZE * 0.5;
+        movingPlatforms.push({ x: x + startXOffset, y, width: TILE_SIZE, height: TILE_SIZE/2, vx: 1, startX: x + startXOffset, range: range });
+        c = endC; 
+      }
+    }
+  }
+}
+
+// ======== Player, Camera & Physics (Giữ nguyên) ========
+let initialPlayerStart = { x: TILE_SIZE*2, y: TILE_SIZE*10 }; 
+const player = {
+  x: initialPlayerStart.x, y: initialPlayerStart.y, width: 28, height: 28,
+  drawWidth: 28, drawHeight: 28, speed: 4.5, vx: 0, vy: 0, 
+  jumpStrength: 13.5, isOnGround: false, jumpsLeft: 2, 
+  lives: 3, maxLives: 3, canDash: true, isDashing: false, dashTimer: 0, dashDir: 0,
+  isWallSliding: false, wallSlideDir: 0, hasKey: false, 
+  isInvincible: false, invincibleTimer: 0,
+  coyoteTimer: 0, jumpBufferTimer: 0
+};
+const COYOTE_TIME = 6; 
+const JUMP_BUFFER = 6; 
+const DASH_DURATION = 8; 
+const DASH_SPEED = 10;
+const INVINCIBLE_DURATION = 300; 
+const camera = { x: 0, y: 0, shake: 0 }; 
+const gravity = 0.65;
+let score = 0;
+let gameWon = false;
+let currentLevelIndex = 0;
+
+// ======== Controls (Giữ nguyên) ========
+let keys = {};
+let touchState = { left: false, right: false, jump: false, dash: false };
+window.addEventListener('keydown', e => { ensureAudio(); keys[e.key.toLowerCase()] = true; if (e.key === ' ') e.preventDefault(); });
+window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+function setupTouchControls() {
+  function handleTouch(e, isStart) {
+    e.preventDefault(); 
+    ensureAudio();
+    const id = e.currentTarget.id;
+    if (id === 'touch-left') touchState.left = isStart;
+    else if (id === 'touch-right') touchState.right = isStart;
+    else if (id === 'touch-jump') {
+        touchState.jump = isStart;
+        if(isStart) player.jumpBufferTimer = JUMP_BUFFER; 
+    }
+    else if (id === 'touch-dash') touchState.dash = isStart;
+  }
+  const buttons = ['touch-left', 'touch-right', 'touch-jump', 'touch-dash'];
+  buttons.forEach(id => {
+    const btn = document.getElementById(id);
+    btn.addEventListener('touchstart', e => handleTouch(e, true), { passive: false });
+    btn.addEventListener('touchend', e => handleTouch(e, false), { passive: false });
+    btn.addEventListener('touchcancel', e => handleTouch(e, false), { passive: false });
+  });
+}
+
+// ======== Game Flow Functions (Giữ nguyên) ========
+function showStoryIntro() {
+  storyScreen.style.display = 'flex';
+  levelIntroScreen.style.display = 'none';
+  levelCompleteScreen.style.display = 'none';
+  startBtn.onclick = () => {
+    storyScreen.style.display = 'none';
+    loadLevel(0); 
+  };
+}
+function showLevelIntro(index) {
+  levelIntroTitle.textContent = `Tuổi ${index + 1}`;
+  levelIntroText.textContent = STORY_DATA[index] || "Một ký ức mới!";
+  levelIntroScreen.style.display = 'flex';
+  playLevelBtn.onclick = startGameLoop;
+}
+function startGameLoop() {
+  levelIntroScreen.style.display = 'none';
+  gameWon = false; 
+  requestAnimationFrame(loop);
+}
+function loadGame() { 
+  // Không reset mạng ở đây
+  showStoryIntro(); 
+}
+function loadLevel(index) {
+  if (index >= TOTAL_LEVELS) {
+    winGame(true); 
+    return;
+  }
+  currentLevelIndex = index;
+  player.lives = player.maxLives; // Reset lives per level
+  score = 0;
+  gameWon = true; 
+  parseLevel(index);
+  resetPlayer(playerStart); 
+  camera.x = 0; 
+  updateUI();
+  levelCompleteScreen.style.display = 'none';
+  showLevelIntro(index); 
+  levelSelect.value = index; // Update dropdown
+}
+function loadNextLevel() { loadLevel(currentLevelIndex + 1); }
+function resetCurrentLevel() { loadLevel(currentLevelIndex); } 
+restartBtn.addEventListener('click', resetCurrentLevel);
+nextLevelBtn.addEventListener('click', loadNextLevel);
+function updateUI() {
+  levelCountUI.textContent = `${currentLevelIndex + 1}/${TOTAL_LEVELS}`;
+  collectCountUI.textContent = `${score}/${targetScore}`;
+  livesCountUI.textContent = '❤️'.repeat(player.lives); 
+}
+function isWall(x, y) {
+  for(const p of platforms) {
+    if (x >= p.x && x < p.x + p.width && y >= p.y && y < p.y + p.height) {
+      return true;
+    }
+  }
+  for(const d of doors) {
+    if (x >= d.x && x < d.x + d.width && y >= d.y && y < d.y + d.height) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// ======== Update Function (Giữ nguyên) ========
+function update() {
+  if (gameWon) return;
+
+  // 1. Update Timers
+  if (player.isInvincible) {
+    player.invincibleTimer--;
+    if (player.invincibleTimer <= 0) player.isInvincible = false;
+  }
+  if (player.coyoteTimer > 0) player.coyoteTimer--;
+  if (player.jumpBufferTimer > 0) player.jumpBufferTimer--;
+  
+  // 2. Handle Input
+  const moveLeft = keys['a'] || keys['arrowleft'] || touchState.left;
+  const moveRight = keys['d'] || keys['arrowright'] || touchState.right;
+  if (keys['w'] || keys['arrowup'] || keys[' ']) {
+      player.jumpBufferTimer = JUMP_BUFFER;
+      keys['w'] = keys['arrowup'] = keys[' '] = false; // Consume press
+  }
+  const jumpBuffered = player.jumpBufferTimer > 0;
+  const dashPressed = (keys['x'] || keys['shift'] || touchState.dash);
+  if (dashPressed) { 
+      keys['x'] = keys['shift'] = touchState.dash = false; 
+  }
+
+  // 3. Dashing
+  if (player.isDashing) {
+    player.dashTimer--;
+    player.vx = player.dashDir * DASH_SPEED;
+    player.vy = 0; 
+    spawnParticles(player.x + player.width/2, player.y + player.height/2, 1, '#fff');
+    if (player.dashTimer <= 0) {
+      player.isDashing = false;
+      player.vx = 0; 
+    }
+  }
+
+  if (!player.isDashing) {
+    // 4. Movement
+    player.vx = 0; 
+    if (moveLeft) player.vx = -player.speed;
+    if (moveRight) player.vx = player.speed;
+
+    // 5. Wall Slide
+    player.isWallSliding = false;
+    if (!player.isOnGround && player.vy > 0 && player.coyoteTimer <= 0) { 
+      if ((moveLeft) && isWall(player.x - 1, player.y + player.height/2)) {
+        player.isWallSliding = true;
+        player.wallSlideDir = -1;
+      }
+      if ((moveRight) && isWall(player.x + player.width + 1, player.y + player.height/2)) {
+        player.isWallSliding = true;
+        player.wallSlideDir = 1;
+      }
+    }
+
+    if (player.isWallSliding) {
+      player.vy = Math.min(player.vy, 2.0); 
+      player.jumpsLeft = 2; 
+      player.canDash = true; 
+      if(player.vy > 1.8 && Math.random() < 0.1) { 
+          playSound('wallslide');
+          spawnParticles(player.x + (player.wallSlideDir > 0 ? player.width : 0), player.y + player.height/2, 1, '#fff');
+      }
+    }
+
+    // 6. Jump
+    if (jumpBuffered) {
+      if (player.isWallSliding) {
+        player.vy = -player.jumpStrength * 1.1;
+        player.vx = -player.wallSlideDir * player.speed * 1.5; 
+        player.jumpsLeft = 1; 
+        player.isWallSliding = false;
+        playSound('walljump'); 
+        spawnParticles(player.x + player.width/2, player.y + player.height/2, 10, COLORS.PLAYER);
+        player.jumpBufferTimer = 0; 
+      }
+      else if (player.coyoteTimer > 0 || player.jumpsLeft > 0) { 
+        if(player.coyoteTimer <= 0) player.jumpsLeft--; 
+        
+        player.vy = -player.jumpStrength;
+        player.isOnGround = false;
+        player.coyoteTimer = 0; 
+        player.jumpBufferTimer = 0; 
+        playSound('jump');
+        spawnParticles(player.x + player.width/2, player.y + player.height, 5, COLORS.PLAYER);
+        player.drawHeight = player.height * 1.3;
+        player.drawWidth = player.width * 0.7;
+      }
+    }
+    
+    // 7. Dash
+    if (dashPressed && player.canDash) {
+      player.isDashing = true;
+      player.canDash = false;
+      player.dashTimer = DASH_DURATION;
+      player.dashDir = (moveLeft ? -1 : (moveRight ? 1 : (player.vx > 0 ? 1 : (player.wallSlideDir !== 0 ? -player.wallSlideDir : 1))));
+      playSound('dash');
+      spawnParticles(player.x + player.width/2, player.y + player.height/2, 20, '#fff');
+    }
+
+    // 8. Apply Gravity
+    if(!player.isWallSliding) player.vy += gravity; 
+  }
+  
+  player.drawWidth += (player.width - player.drawWidth) * 0.1;
+  player.drawHeight += (player.height - player.drawHeight) * 0.1;
+
+  // 9. Apply Movement & Collisions
+  player.x += player.vx;
+  const allObstaclesX = [...platforms, ...movingPlatforms, ...doors, ...springs]; 
+  for(const p of allObstaclesX) {
+      if (rectOverlap(player, p)) {
+          if (player.vx > 0) {
+              player.x = p.x - player.width;
+          } else if (player.vx < 0) {
+              player.x = p.x + p.width;
+          }
+           // Dừng dash nếu đâm vào tường/vật cản
+          if (player.isDashing) {
+              player.isDashing = false;
+              player.vx = 0;
+          }
+      }
+  }
+
+  player.y += player.vy;
+  const wasOnGround = player.isOnGround; 
+  player.isOnGround = false; 
+  let onMovingPlatform = null;
+
+  function handleLand(platformY) {
+    if (!wasOnGround) { 
+      spawnParticles(player.x + player.width/2, platformY, 5, COLORS.PLATFORM);
+      player.drawHeight = player.height * 0.7;
+      player.drawWidth = player.width * 1.3;
+    }
+    player.y = platformY - player.height; 
+    player.vy = 0;
+    player.isOnGround = true;
+    player.jumpsLeft = 2; 
+    player.canDash = true; 
+    player.coyoteTimer = COYOTE_TIME; 
+  }
+  
+  for (const p of [...platforms, ...movingPlatforms, ...doors]) { 
+    if (rectOverlap(player, p)) { 
+      if(handlePlatformCollision(player, p)) { 
+        handleLand(p.y); 
+        if(movingPlatforms.includes(p)) onMovingPlatform = p;
+      }
+    }
+  }
+  if (onMovingPlatform) { player.x += onMovingPlatform.vx; }
+
+  // Xử lý va chạm Y với Springs riêng
+  for (const s of springs) {
+    if (rectOverlap(player, s) && player.vy > 0 && (player.y + player.height - player.vy) <= s.y) { // Chỉ khi đáp từ trên xuống
+        handleLand(s.y); // Land first
+        player.vy = -player.jumpStrength * 2; // Super jump!
+        player.isOnGround = false; 
+        player.coyoteTimer = 0; 
+        player.jumpsLeft = 2; player.canDash = true;
+        playSound('jump');
+        spawnParticles(player.x + player.width/2, player.y + player.height, 20, COLORS.SPRING);
+    } else if (rectOverlap(player, s) && player.vy < 0 && (player.y - player.vy) >= (s.y + s.height)) {
+        // Bonk head on spring underside
+        player.y = s.y + s.height;
+        player.vy = 0;
+    }
+  }
+  
+  if (player.y + player.height > canvas.height) { handleLand(canvas.height); }
+  if (player.x < 0) player.x = 0;
+  if (player.x + player.width > levelWidth) player.x = levelWidth - player.width;
+  
+  if (wasOnGround && !player.isOnGround && player.vy > 0 && !player.isWallSliding) {
+      player.coyoteTimer = COYOTE_TIME;
+  }
+
+  // 10. Collisions (Other)
+  for (const c of collectibles) {
+    if (!c.collected && rectOverlap(player, {x: c.x-c.radius, y: c.y-c.radius, width: c.radius*2, height: c.radius*2})) {
+        c.collected = true; score++; updateUI(); playSound('collect');
+        spawnParticles(c.x, c.y, 10, COLORS.COLLECT);
+    }
+  }
+  for (const h of hearts) {
+    if (!h.collected && rectOverlap(player, {x: h.x-h.radius, y: h.y-h.radius, width: h.radius*2, height: h.radius*2})) {
+        h.collected = true;
+        player.isInvincible = true;
+        player.invincibleTimer = INVINCIBLE_DURATION;
+        playSound('powerup');
+        spawnParticles(h.x, h.y, 20, 'pink');
+    }
+  }
+  for (const k of keyItems) {
+    if (!k.collected && rectOverlap(player, k)) {
+        k.collected = true;
+        player.hasKey = true;
+        playSound('powerup');
+        spawnParticles(k.x + k.width/2, k.y + k.height/2, 20, COLORS.KEY);
+        // Mở cửa
+        for(let i = doors.length - 1; i >= 0; i--) {
+            spawnParticles(doors[i].x + TILE_SIZE/2, doors[i].y + TILE_SIZE/2, 10, COLORS.DOOR);
+            doors.splice(i, 1);
+            playSound('open');
+        }
+    }
+  }
+  
+  if (player.isInvincible) {
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        const e = enemies[i];
+        if (e.dead) continue; 
+        if (rectOverlap(player, e)) { 
+            e.dead = true; e.deadTimer = 30; 
+            playSound('stomp'); camera.shake = 8;
+            spawnParticles(e.x + e.width/2, e.y + e.height/2, 15, COLORS.ENEMY);
+        }
+      }
+  } else {
+    // Va chạm gai
+    for (const s of spikes) {
+      if (player.x < s.x + TILE_SIZE && player.x + player.width > s.x &&
+          player.y < s.y + TILE_SIZE && player.y + player.height > s.y + TILE_SIZE/2) {
+        handlePlayerHit();
+      }
+    }
+    // Va chạm kẻ thù
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const e = enemies[i];
+      if (e.dead) continue; 
+      if (rectOverlap(player, e)) {
+        if (player.vy > 0 && (player.y + player.height - player.vy) <= e.y + e.height/2 && !player.isDashing) {
+          e.dead = true; e.deadTimer = 30; 
+          player.vy = -player.jumpStrength * 0.7; 
+          player.jumpsLeft = 2; player.canDash = true;
+          playSound('stomp'); camera.shake = 8;
+          spawnParticles(e.x + e.width/2, e.y + e.height/2, 15, COLORS.ENEMY);
+        } else if (player.isDashing) { 
+          e.dead = true; e.deadTimer = 30; 
+          playSound('stomp'); camera.shake = 8;
+          spawnParticles(e.x + e.width/2, e.y + e.height/2, 15, COLORS.ENEMY);
+        } else {
+          handlePlayerHit();
+        }
+      }
+    }
+    // Va chạm Lava
+    for(const l of lavas) {
+        if(rectOverlap(player, l)) handlePlayerHit();
+    }
+  }
+  
+  for(const k of checkpoints) {
+    if(!k.activated && rectOverlap(player, k)) {
+      k.activated = true;
+      lastCheckpointPos = {x: k.x, y: k.y + TILE_SIZE - player.height};
+      playSound('collect');
+      spawnParticles(k.x + k.width/2, k.y + k.height/2, 20, COLORS.CHECKPOINT);
+    }
+  }
+  
+  if (goal && score === targetScore && rectOverlap(player, {x:goal.x, y:goal.y, width:TILE_SIZE, height:TILE_SIZE})) { 
+    if(!player.hasKey && keyItems.length > 0) { /* Cần chìa khóa nhưng chưa có */ }
+    else { winGame(false); }
+  }
+
+  // 11. Update objects & camera
+  updateEnemies();
+  updateMovingPlatforms();
+  updateParticles(); 
+  updateCamera();
+}
+
+// ======== Các hàm khác (Giữ nguyên) ========
+function handlePlayerHit() {
+  if (gameWon || player.isInvincible) return; 
+  player.lives--;
+  updateUI();
+  playSound('hit');
+  camera.shake = 15; 
+  spawnParticles(player.x + player.width/2, player.y + player.height/2, 20, 'white');
+  
+  if (player.lives <= 0) {
+    showLevelLostScreen(); 
+  } else {
+    resetPlayer(lastCheckpointPos || playerStart); 
+  }
+}
+function showLevelLostScreen() { 
+  gameWon = true; 
+  playSound('hit');
+  winTitle.textContent = "Bạn Đã Hết Mạng!";
+  winMessage.textContent = `Đừng lo, hãy thử lại ký ức tuổi ${currentLevelIndex + 1} nhé!`;
+  nextLevelBtn.style.display = 'none';
+  restartBtn.textContent = "Chơi Lại Level"; 
+  restartBtn.onclick = resetCurrentLevel; 
+  levelCompleteScreen.style.display = 'flex'; 
+}
+
+function rectOverlap(r1, r2) { return r1.x < r2.x + r2.width && r1.x + r1.width > r2.x && r1.y < r2.y + r2.height && r1.y + r1.height > r2.y; }
+function handlePlatformCollision(player, p) {
+  if (player.vy > 0 && (player.y + player.height - player.vy) <= p.y) { return true; // Landed
+  } else if (player.vy < 0 && (player.y - player.vy) >= (p.y + p.height)) { player.y = p.y + p.height; player.vy = 0; 
+  } 
+  return false; 
+}
+function updateEnemies() {
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const e = enemies[i];
+    if (e.dead) { e.deadTimer--; if (e.deadTimer <= 0) enemies.splice(i, 1); continue; }
+    e.x += e.vx;
+    if (e.x < e.startX || e.x > e.startX + e.range) { e.vx *= -1; }
+  }
+}
+function updateMovingPlatforms() { for(const p of movingPlatforms) { p.x += p.vx; if (p.x < p.startX || p.x > p.startX + p.range) { p.vx *= -1; } } }
+function updateCamera() {
+  const targetCamX = player.x - canvas.width / 2 + player.width / 2;
+  camera.x += (targetCamX - camera.x) * 0.1; 
+  camera.x = Math.max(0, Math.min(camera.x, levelWidth - canvas.width));
+  camera.y = 0; 
+  if(camera.shake > 0) camera.shake *= 0.9; 
+}
+function resetPlayer(pos) {
+  // SỬA LỖI: Đảm bảo 'pos' hợp lệ trước khi sử dụng
+  const resetPos = pos && typeof pos.x === 'number' && typeof pos.y === 'number' ? pos : playerStart;
+  player.x = resetPos.x;
+  player.y = resetPos.y;
+  player.vx = 0; player.vy = 0;
+  player.jumpsLeft = 2; 
+  player.canDash = true;
+  player.isDashing = false;
+  player.isWallSliding = false;
+  player.isInvincible = false; 
+  player.invincibleTimer = 0;
+  player.coyoteTimer = 0; 
+  player.jumpBufferTimer = 0;
+}
+
+function winGame(allLevelsComplete) {
+  gameWon = true; 
+  playSound('win');
+  if (allLevelsComplete) {
+    winTitle.textContent = "HOÀN THÀNH!";
+    winMessage.textContent = `Chúc Mừng Sinh Nhật Tuổi 18, Nhiên! 🎂 Bạn đã hoàn thành hành trình ký ức!`;
+    nextLevelBtn.style.display = 'none'; 
+    restartBtn.textContent = "Chơi Lại Từ Đầu"; 
+    restartBtn.onclick = loadGame;
+  } else {
+    winTitle.textContent = `Hoàn Thành Ký Ức Tuổi ${currentLevelIndex + 1}!`;
+    winMessage.textContent = "Sẵn sàng cho tuổi tiếp theo?";
+    nextLevelBtn.style.display = 'inline-block';
+    restartBtn.textContent = "Chơi lại Level";
+    restartBtn.onclick = resetCurrentLevel; 
+  }
+  levelCompleteScreen.style.display = 'flex'; 
+}
+
+// ======== Draw Function (Cập nhật drawPlayer) ========
+function draw() {
+  const now = Date.now(); 
+
+  ctx.fillStyle = COLORS.BG; 
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  ctx.save();
+  const shakeX = (Math.random() - 0.5) * camera.shake;
+  const shakeY = (Math.random() - 0.5) * camera.shake;
+  ctx.translate(-camera.x + shakeX, -camera.y + shakeY);
+
+  // Vẽ Lava trước
+  ctx.fillStyle = COLORS.LAVA;
+  for (const l of lavas) { ctx.fillRect(l.x, l.y, l.width, l.height + TILE_SIZE/2); } 
+
+  ctx.fillStyle = COLORS.PLATFORM;
+  for (const p of platforms) { ctx.fillRect(p.x, p.y, p.width, p.height); }
+  ctx.fillStyle = COLORS.MOVING_PLATFORM;
+  for (const p of movingPlatforms) { ctx.fillRect(p.x, p.y, p.width, p.height); }
+  ctx.fillStyle = COLORS.SPRING; 
+  for (const s of springs) { ctx.fillRect(s.x, s.y, s.width, s.height); }
+  ctx.fillStyle = COLORS.DOOR; 
+  for (const d of doors) { 
+      ctx.fillRect(d.x, d.y, d.width, d.height); 
+      ctx.fillStyle = COLORS.DOOR_PANEL;
+      ctx.fillRect(d.x + 5, d.y + 5, d.width - 10, d.height - 10); // Panel
+      ctx.fillStyle = COLORS.DOOR_LOCK;
+      ctx.fillRect(d.x + TILE_SIZE/2 - 5, d.y + TILE_SIZE/2 - 5, 10, 10); // Ổ khóa
+      ctx.fillStyle = COLORS.DOOR;
+  }
+  
+  ctx.fillStyle = COLORS.HAZARD;
+  for (const s of spikes) { ctx.beginPath(); ctx.moveTo(s.x, s.y + TILE_SIZE); ctx.lineTo(s.x + TILE_SIZE / 2, s.y); ctx.lineTo(s.x + TILE_SIZE, s.y + TILE_SIZE); ctx.closePath(); ctx.fill(); }
+  
+  // Vẽ Items (với animation)
+  const animOffset = Math.sin(now / 200) * 3; 
+  const glowAmount = Math.abs(Math.sin(now / 300)) * 5; 
+
+  ctx.strokeStyle = COLORS.COLLECT; ctx.lineWidth = 2;
+  for (const c of collectibles) {
+    if (!c.collected) {
+      const drawY = c.y + animOffset;
+      ctx.fillStyle = `rgba(247, 184, 1, ${glowAmount / 15})`;
+      ctx.beginPath(); ctx.arc(c.x, drawY, c.radius + glowAmount, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(c.x, drawY + c.radius); ctx.lineTo(c.x, drawY + c.radius + 15); ctx.stroke();
+      ctx.fillStyle = COLORS.COLLECT; ctx.beginPath(); ctx.arc(c.x, drawY, c.radius, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.fillStyle = COLORS.KEY; 
+  for (const k of keyItems) {
+      if(!k.collected) {
+        const drawY = k.y + animOffset * 1.5; 
+        ctx.fillStyle = `rgba(255, 195, 0, ${glowAmount / 15})`;
+        ctx.fillRect(k.x + 10, drawY + 5, 20, 30);
+        ctx.fillStyle = COLORS.KEY;
+        ctx.fillRect(k.x + 15, drawY + 10, 10, 10); // Head
+        ctx.fillRect(k.x + 18, drawY + 20, 4, 15); // Body
+      }
+  }
+  ctx.fillStyle = '#ff4d4d'; // Màu tim
+  for (const h of hearts) {
+      if(!h.collected) {
+        const drawY = h.y + animOffset;
+        ctx.fillStyle = `rgba(255, 77, 77, ${glowAmount / 20})`;
+        ctx.beginPath(); ctx.arc(h.x, drawY, h.radius + glowAmount, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ff4d4d';
+        ctx.beginPath();
+        ctx.arc(h.x - h.radius/2, drawY - h.radius/4, h.radius/2, 0.7 * Math.PI, 2 * Math.PI);
+        ctx.arc(h.x + h.radius/2, drawY - h.radius/4, h.radius/2, 0.8 * Math.PI, 2.3 * Math.PI);
+        ctx.lineTo(h.x, drawY + h.radius * 0.75);
+        ctx.closePath();
+        ctx.fill();
+      }
+  }
+  // (Vẽ Checkpoint, Goal, Enemies)
+  ctx.fillStyle = COLORS.CHECKPOINT;
+  for(const k of checkpoints) {
+    ctx.globalAlpha = k.activated ? 1.0 : 0.5;
+    if (k.activated) {
+        ctx.fillStyle = `rgba(247, 184, 1, ${glowAmount / 15})`;
+        ctx.fillRect(k.x, k.y, TILE_SIZE, TILE_SIZE);
+        ctx.fillStyle = COLORS.CHECKPOINT; // Reset color
+    }
+    ctx.fillRect(k.x + TILE_SIZE/2 - 2, k.y, 4, TILE_SIZE); // Cột cờ
+    ctx.beginPath(); // Lá cờ
+    const flagY = k.activated ? k.y : k.y + TILE_SIZE / 2;
+    ctx.moveTo(k.x + TILE_SIZE/2 + 2, flagY);
+    ctx.lineTo(k.x + TILE_SIZE/2 + 2, flagY + TILE_SIZE/3);
+    ctx.lineTo(k.x + TILE_SIZE - 5, flagY + TILE_SIZE/6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1.0;
+  }
+  if (goal) {
+    ctx.globalAlpha = (player.hasKey || keyItems.length === 0) ? 1.0 : 0.3; 
+    ctx.fillStyle = '#fff'; ctx.fillRect(goal.x + 8, goal.y + 10, TILE_SIZE - 16, TILE_SIZE - 15); 
+    ctx.fillStyle = '#ffc0cb'; ctx.fillRect(goal.x + 5, goal.y + 15, TILE_SIZE - 10, TILE_SIZE - 25); 
+    ctx.fillStyle = '#ff0000'; ctx.fillRect(goal.x + 12, goal.y, 4, 10); ctx.fillRect(goal.x + 24, goal.y, 4, 10);
+    if (score === targetScore) { ctx.fillStyle = '#ffa500'; ctx.fillRect(goal.x + 12, goal.y - 5, 4, 5); ctx.fillRect(goal.x + 24, goal.y - 5, 4, 5); }
+    ctx.globalAlpha = 1.0;
+  }
+  ctx.fillStyle = COLORS.ENEMY;
+  for (const e of enemies) {
+    if (e.dead) { ctx.globalAlpha = e.deadTimer / 30.0; } 
+    ctx.fillRect(e.x, e.y, e.width, e.height);
+    ctx.globalAlpha = 1.0;
+    if (!e.dead) {
+      ctx.fillStyle = COLORS.ENEMY_EYE;
+      ctx.fillRect(e.x + (e.vx > 0 ? 18 : 5), e.y + 8, 5, 5);
+      ctx.fillStyle = COLORS.ENEMY;
+    }
+  }
+
+  // Draw Player (với Sprite đơn giản)
+  drawPlayer(); 
+
+  drawParticles(); 
+  ctx.restore(); 
+
+  if (!gameWon) {
+    requestAnimationFrame(loop);
+  }
+}
+
+// NEW: Hàm vẽ Player Sprite
+function drawPlayer() {
+    const now = Date.now();
+    ctx.globalAlpha = 1.0;
+    if(player.isInvincible) { 
+        ctx.globalAlpha = (Math.floor(now / 100) % 2 === 0) ? 1.0 : 0.4;
+    }
+
+    let playerColor = player.isDashing ? '#fff' : COLORS.PLAYER; 
+    if (player.isWallSliding) playerColor = '#aaa'; 
+    
+    // Tính toán vị trí và kích thước vẽ (cho Squash & Stretch)
+    const drawX = player.x + (player.width - player.drawWidth) / 2;
+    const drawY = player.y + (player.height - player.drawHeight);
+    const drawW = player.drawWidth;
+    const drawH = player.drawHeight;
+
+    // Vẽ Thân
+    ctx.fillStyle = playerColor;
+    ctx.fillRect(drawX, drawY, drawW, drawH);
+
+    // Vẽ Chân (chỉ khi không trượt tường)
+    if (!player.isWallSliding) {
+        ctx.fillStyle = COLORS.PLAYER_FEET;
+        const feetHeight = drawH * 0.2;
+        ctx.fillRect(drawX, drawY + drawH - feetHeight, drawW, feetHeight);
+    }
+    
+    // Vẽ Mắt
+    ctx.globalAlpha *= 1.0; // Mắt không bị ảnh hưởng bởi nhấp nháy bất tử
+    ctx.fillStyle = '#111';
+    const eyeSize = Math.max(3, drawW * 0.18); // Kích thước mắt co giãn theo
+    const eyeY = drawY + drawH * 0.3;
+
+    if(player.vx === 0 && !player.isWallSliding && !player.isDashing) { // Đứng yên
+        const eyeX1 = drawX + drawW * 0.25 - eyeSize / 2;
+        const eyeX2 = drawX + drawW * 0.75 - eyeSize / 2;
+        ctx.fillRect(eyeX1, eyeY, eyeSize, eyeSize);
+        ctx.fillRect(eyeX2, eyeY, eyeSize, eyeSize);
+    } else { // Di chuyển hoặc Lướt
+        const eyeX = drawX + (player.vx > 0 || (player.isDashing && player.dashDir > 0) ? drawW * 0.75 - eyeSize : drawW * 0.25 - eyeSize/2);
+        ctx.fillRect(eyeX, eyeY, eyeSize, eyeSize);
+    }
+    ctx.globalAlpha = 1.0; // Reset alpha
+}
+
+
+function loop() {
+  update();
+  draw();
+}
+
+// ======== Start Game ========
+// Populate Level Select
+for (let i = 0; i < TOTAL_LEVELS; i++) {
+    const option = document.createElement('option');
+    option.value = i;
+    option.textContent = `Level ${i + 1}`;
+    levelSelect.appendChild(option);
+}
+levelSelect.addEventListener('change', (e) => {
+    const selectedLevel = parseInt(e.target.value);
+    loadLevel(selectedLevel);
+});
+
+setupTouchControls(); // Kích hoạt nút cảm ứng
+loadGame(); // Bắt đầu game
+
+</script>
+</body>
+</html>
