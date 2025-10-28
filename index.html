@@ -196,9 +196,9 @@
     </div>
   </div>
 
-  <audio id="bgMusic" src="retro-8bit-happy-videogame-music-418481.mp3" loop></audio> 
-  <audio id="musicCalm" src="flat-8-bit-gaming-music-instrumental-211547.mp3" loop></audio>
-  <audio id="musicFinal" src="the-console-of-my-dreams-301289.mp3" loop></audio>
+  <audio id="bgMusic" src="retro-8bit-happy-videogame-music-418481.mp3"></audio> 
+  <audio id="musicCalm" src="flat-8-bit-gaming-music-instrumental-211547.mp3"></audio>
+  <audio id="musicFinal" src="the-console-of-my-dreams-301289.mp3"></audio>
 
   <div id="touch-controls">
     <div class="touch-group left">
@@ -828,43 +828,49 @@ function loadGame() {
   showStoryIntro(); 
 }
 
-// === HÀM loadLevel ĐÃ SỬA ĐỔI ===
+// === HÀM loadLevel VỚI LOGIC NHẠC LIỀN MẠCH (ĐÃ SỬA) ===
 function loadLevel(index) {
   if (index >= TOTAL_LEVELS) {
     winGame(true); 
     return;
   }
+  
+  // Xác định nhạc cho màn sắp tới trước khi làm gì khác
+  let nextTrack = null; 
+  if (musicStarted) { 
+      if (index === 17) { // Màn 18 (index 17)
+          nextTrack = musicFinal;
+      } else if (index >= 0 && index <= 8) { // Màn 1-9 (Tuổi 1-9)
+          nextTrack = musicCalm;
+      } else { // Màn 10-17 (Tuổi 10-17)
+          nextTrack = bgMusic; 
+      }
+      
+      // Chỉ dừng và đổi nhạc nếu bản nhạc mới khác bản nhạc hiện tại
+      if (nextTrack !== currentTrack) {
+          stopAllMusic(); 
+          currentTrack = nextTrack; 
+          if (currentTrack) {
+              currentTrack.volume = 0.3;
+              currentTrack.currentTime = 0; // Bắt đầu lại từ đầu khi đổi nhạc
+              currentTrack.play().catch(e => console.log("Lỗi phát nhạc:", e));
+          }
+      } 
+      // Nếu nextTrack === currentTrack, không làm gì cả
+  }
+
+  // Các phần còn lại của loadLevel
   currentLevelIndex = index;
-  player.lives = player.maxLives; // Reset lives per level
+  player.lives = player.maxLives; 
   score = 0;
   gameWon = true; 
-  parseLevel(index); // Bây giờ gọi parseLevel là hợp lệ
+  parseLevel(index); 
   resetPlayer(playerStart); 
   camera.x = 0; 
   updateUI();
   levelCompleteScreen.style.display = 'none';
   showLevelIntro(index); 
-  levelSelect.value = index; // Update dropdown
-  
-  // === LOGIC PHÁT NHẠC MỚI (ĐÃ CHỈNH SỬA) ===
-  if (musicStarted) { // Chỉ phát nhạc nếu người dùng đã tương tác
-      stopAllMusic(); // Dừng nhạc cũ
-
-      if (index === 17) { // Màn 18 (index 17) là màn cuối
-          currentTrack = musicFinal;
-      } else if (index >= 0 && index <= 8) { // Màn 1-9 (Tuổi 1-9)
-          currentTrack = musicCalm;
-      } else { // Màn 10-17 (Tuổi 10-17)
-          currentTrack = bgMusic; // Nhạc retro phát ở giữa
-      }
-      
-      if (currentTrack) {
-          currentTrack.volume = 0.3;
-          currentTrack.currentTime = 0; // Bắt đầu lại từ đầu
-          currentTrack.play().catch(e => console.log("Lỗi phát nhạc:", e));
-      }
-  }
-  // ============================
+  levelSelect.value = index; 
 }
 
 function loadNextLevel() { loadLevel(currentLevelIndex + 1); }
