@@ -197,6 +197,9 @@
   </div>
 
   <audio id="bgMusic" src="retro-8bit-happy-videogame-music-418481.mp3" loop></audio> 
+  
+  <audio id="musicCalm" src="flat-8-bit-gaming-music-instrumental-211547.mp3" loop></audio>
+  <audio id="musicFinal" src="the-console-of-my-dreams-301289.mp3" loop></audio>
 
   <div id="touch-controls">
     <div class="touch-group left">
@@ -231,6 +234,10 @@ const playLevelBtn = document.getElementById('playLevelBtn');
 const levelSelect = document.getElementById('levelSelect'); 
 const bgMusic = document.getElementById('bgMusic'); 
 
+// === THÊM 2 BIẾN NHẠC MỚI ===
+const musicCalm = document.getElementById('musicCalm'); 
+const musicFinal = document.getElementById('musicFinal'); 
+
 const COLORS = {
   BG: '#0f172a', PLATFORM: '#16213e', PLAYER: '#ff8fb1', PLAYER_FEET: '#d16a8b',
   COLLECT: '#f7b801', HAZARD: '#e74c3c', ENEMY: '#ff4d4d', ENEMY_EYE: '#fff',
@@ -240,15 +247,28 @@ const COLORS = {
 
 let audioCtx = null;
 let musicStarted = false; 
+
+// === HÀM ensureAudio ĐÃ SỬA ===
 function ensureAudio() { 
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); 
     audioCtx.resume(); 
-    if (!musicStarted && bgMusic.src && bgMusic.src.includes('mp3') ) { 
-        bgMusic.volume = 0.3; 
-        bgMusic.play().catch(e => console.log("Autoplay failed, user interaction needed.")); 
-        musicStarted = true;
-    }
+    musicStarted = true; // Chỉ cần kích hoạt, loadLevel sẽ xử lý phát nhạc
 }
+
+// === THÊM BIẾN VÀ HÀM QUẢN LÝ NHẠC ===
+let currentTrack = null; // Biến để theo dõi nhạc đang phát
+
+function stopAllMusic() {
+    if (currentTrack) {
+        currentTrack.pause();
+        currentTrack.currentTime = 0; // Tua về đầu
+    }
+    // Đảm bảo tất cả đều tắt (dự phòng)
+    bgMusic.pause();
+    musicCalm.pause();
+    musicFinal.pause();
+}
+
 // (Hàm playSound... giữ nguyên)
 function playSound(type) {
   if (!audioCtx) return;
@@ -787,12 +807,13 @@ function setupTouchControls() {
   });
 }
 
-// ======== Game Flow Functions (Giữ nguyên) ========
+// ======== Game Flow Functions (Đã SỬA) ========
 function showStoryIntro() {
   storyScreen.style.display = 'flex';
   levelIntroScreen.style.display = 'none';
   levelCompleteScreen.style.display = 'none';
   startBtn.onclick = () => {
+    ensureAudio(); // <<< KÍCH HOẠT ÂM THANH KHI BẤM NÚT BẮT ĐẦU
     storyScreen.style.display = 'none';
     loadLevel(0); 
   };
@@ -812,7 +833,8 @@ function loadGame() {
   // Không reset mạng ở đây
   showStoryIntro(); 
 }
-// SỬA LỖI: Hàm loadLevel phải được định nghĩa sau parseLevel
+
+// === HÀM loadLevel ĐÃ SỬA ĐỔI ===
 function loadLevel(index) {
   if (index >= TOTAL_LEVELS) {
     winGame(true); 
@@ -829,7 +851,28 @@ function loadLevel(index) {
   levelCompleteScreen.style.display = 'none';
   showLevelIntro(index); 
   levelSelect.value = index; // Update dropdown
+  
+  // === LOGIC PHÁT NHẠC MỚI ===
+  if (musicStarted) { // Chỉ phát nhạc nếu người dùng đã tương tác
+      stopAllMusic(); // Dừng nhạc cũ
+
+      if (index === 17) { // Màn 18 (index 17) là màn cuối
+          currentTrack = musicFinal;
+      } else if (index >= 9 && index <= 11) { // Màn 10, 11, 12 (Tuổi 10-12)
+          currentTrack = musicCalm;
+      } else { // Tất cả các màn khác
+          currentTrack = bgMusic;
+      }
+      
+      if (currentTrack) {
+          currentTrack.volume = 0.3;
+          currentTrack.currentTime = 0; // Bắt đầu lại từ đầu
+          currentTrack.play().catch(e => console.log("Lỗi phát nhạc:", e));
+      }
+  }
+  // ============================
 }
+
 function loadNextLevel() { loadLevel(currentLevelIndex + 1); }
 function resetCurrentLevel() { loadLevel(currentLevelIndex); } 
 restartBtn.addEventListener('click', resetCurrentLevel);
@@ -1409,6 +1452,3 @@ loadGame(); // Bắt đầu game
 </script>
 </body>
 </html>
-
-
-
