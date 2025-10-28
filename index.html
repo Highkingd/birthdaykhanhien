@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-<title>Khả Nhiên - v12.1 (Function Order Fix)</title> 
+<title>Khả Nhiên - v12.1 (Achievements + Loop Restored)</title> 
 <style>
   :root {
     --bg: #1a1a2e;
@@ -121,6 +121,25 @@
   .btn:hover { transform: scale(1.05); }
   .btn.secondary { background: #334; }
 
+  /* === THÊM STYLE CHO DANH SÁCH KỸ NĂNG === */
+  #achievementScreen ul {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 15px;
+    margin-bottom: 15px;
+    display: inline-block; /* Để background vừa với nội dung */
+    text-align: left;
+    list-style: none; /* Bỏ dấu chấm đầu dòng */
+    font-size: 1.1em; 
+    line-height: 1.6;
+  }
+  #achievementScreen ul li {
+    margin-bottom: 8px;
+  }
+  /* ======================================= */
+
+
   /* Nút cảm ứng */
   #touch-controls {
     position: fixed;
@@ -194,11 +213,22 @@
       <button id="nextLevelBtn" class="btn">Level Tiếp Theo</button>
       <button id="restartBtn" class="btn secondary">Chơi lại</button>
     </div>
-  </div>
 
-  <audio id="bgMusic" src="retro-8bit-happy-videogame-music-418481.mp3"></audio> 
-  <audio id="musicCalm" src="flat-8-bit-gaming-music-instrumental-211547.mp3"></audio>
-  <audio id="musicFinal" src="the-console-of-my-dreams-301289.mp3"></audio>
+    <div id="achievementScreen" class="overlay-screen">
+      <h1>✨ Tuổi 18 Rực Rỡ! ✨</h1>
+      <p>Chúc mừng Nhiên đã hoàn thành hành trình ký ức!<br>Bạn đã mở khóa những "kỹ năng" mới:</p>
+      <ul>
+        <li>🌟 **Bản Lĩnh Vững Vàng:** Sẵn sàng đối mặt thử thách mới!</li>
+        <li>💡 **Sáng Tạo Không Ngừng:** Biến ước mơ thành hiện thực!</li>
+        <li>💖 **Trái Tim Rộng Mở:** Yêu thương và được yêu thương!</li>
+        <li>🚀 **Chinh Phục Tương Lai:** Tự tin bước vào đời!</li>
+      </ul>
+      <p>Chúc bạn một sinh nhật thật vui và một tuổi mới đầy thành công!</p>
+      <button id="replayGameBtn" class="btn">Chơi Lại Từ Đầu</button>
+    </div>
+    </div> <audio id="bgMusic" src="retro-8bit-happy-videogame-music-418481.mp3" loop></audio> 
+  <audio id="musicCalm" src="flat-8-bit-gaming-music-instrumental-211547.mp3" loop></audio>
+  <audio id="musicFinal" src="the-console-of-my-dreams-301289.mp3" loop></audio>
 
   <div id="touch-controls">
     <div class="touch-group left">
@@ -235,6 +265,11 @@ const bgMusic = document.getElementById('bgMusic');
 const musicCalm = document.getElementById('musicCalm'); 
 const musicFinal = document.getElementById('musicFinal'); 
 
+// === THÊM BIẾN CHO MÀN HÌNH THÀNH TỰU ===
+const achievementScreen = document.getElementById('achievementScreen');
+const replayGameBtn = document.getElementById('replayGameBtn');
+// ======================================
+
 const COLORS = {
   BG: '#0f172a', PLATFORM: '#16213e', PLAYER: '#ff8fb1', PLAYER_FEET: '#d16a8b',
   COLLECT: '#f7b801', HAZARD: '#e74c3c', ENEMY: '#ff4d4d', ENEMY_EYE: '#fff',
@@ -270,6 +305,7 @@ function playSound(type) {
   o.connect(g); g.connect(audioCtx.destination);
   g.gain.setValueAtTime(0, audioCtx.currentTime);
   g.gain.linearRampToValueAtTime(0.05, audioCtx.currentTime + 0.01);
+  // ... (các loại âm thanh khác giữ nguyên) ...
   if (type === 'jump') { o.type = 'triangle'; o.frequency.value = 880; g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.3);
   } else if (type === 'collect') { o.type = 'sine'; o.frequency.value = 1046; g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.2);
   } else if (type === 'hit') { o.type = 'sawtooth'; o.frequency.value = 330; o.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.15); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.15);
@@ -279,7 +315,8 @@ function playSound(type) {
   } else if (type === 'open') { o.type = 'sine'; o.frequency.value = 784; g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4); 
   } else if (type === 'wallslide') { o.type = 'sine'; o.frequency.value = 220; g.gain.setValueAtTime(0.01, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1); 
   } else if (type === 'walljump') { o.type = 'triangle'; o.frequency.value = 988; g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.3); 
-  } else if (type === 'win') { o.type = 'triangle'; o.frequency.value = 523; g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.0);
+  } 
+  else if (type === 'win') { o.type = 'triangle'; o.frequency.value = 523; g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.0);
     setTimeout(() => { const o2 = audioCtx.createOscillator(), g2 = audioCtx.createGain(); o2.connect(g2); g2.connect(audioCtx.destination); o2.type = 'triangle'; o2.frequency.value = 659; g2.gain.setValueAtTime(0.05, audioCtx.currentTime); g2.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.8); o2.start(); o2.stop(audioCtx.currentTime + 0.8); }, 200);
   }
   o.start(); o.stop(audioCtx.currentTime + 0.5);
@@ -309,7 +346,7 @@ const STORY_DATA = [
 
 // ======== Level Design (18 Levels Hoàn Chỉnh) ========
 const TILE_SIZE = 40;
-// ?: Ô có thể ngẫu nhiên là Floor, Spike, hoặc Spring
+// ... (LEVEL_MAP_1 đến LEVEL_MAP_18 giữ nguyên - khoảng 700 dòng) ...
 const LEVEL_MAP_1 = [ 
   "                                        ",
   "                                        ",
@@ -622,7 +659,6 @@ const LEVEL_MAP_18 = [ // Final Challenge/Celebration
     "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
 ];
 
-// Combine all level maps
 const ALL_LEVELS = [
     LEVEL_MAP_1, LEVEL_MAP_2, LEVEL_MAP_3, LEVEL_MAP_4, LEVEL_MAP_5,
     LEVEL_MAP_6, LEVEL_MAP_7, LEVEL_MAP_8, LEVEL_MAP_9, LEVEL_MAP_10,
@@ -631,8 +667,87 @@ const ALL_LEVELS = [
 ];
 const TOTAL_LEVELS = ALL_LEVELS.length; // Should be 18
 
-// (Các biến và hàm còn lại giữ nguyên)
-// ... (Game Objects, Particle System, Level Parser, Player, Camera, Physics, Controls, Game Flow, Update, Draw, etc.) ...
+// ... (Rest of the code remains the same: Game Objects, Particles, Level Parser, Player, Controls, Update, Draw functions) ...
+
+// === HÀM loadLevel VỚI LOGIC NHẠC LIỀN MẠCH ===
+function loadLevel(index) {
+  if (index >= TOTAL_LEVELS) {
+    winGame(true); 
+    return;
+  }
+  
+  // Xác định nhạc cho màn sắp tới trước khi làm gì khác
+  let nextTrack = null; 
+  if (musicStarted) { 
+      if (index === 17) { // Màn 18 (index 17)
+          nextTrack = musicFinal;
+      } else if (index >= 0 && index <= 8) { // Màn 1-9 (Tuổi 1-9)
+          nextTrack = musicCalm;
+      } else { // Màn 10-17 (Tuổi 10-17)
+          nextTrack = bgMusic; 
+      }
+      
+      // Chỉ dừng và đổi nhạc nếu bản nhạc mới khác bản nhạc hiện tại
+      if (nextTrack !== currentTrack) {
+          stopAllMusic(); 
+          currentTrack = nextTrack; 
+          if (currentTrack) {
+              currentTrack.volume = 0.3;
+              currentTrack.currentTime = 0; // Bắt đầu lại từ đầu khi đổi nhạc
+              // Đảm bảo nhạc lặp lại (do đã thêm 'loop' vào HTML)
+              currentTrack.play().catch(e => console.log("Lỗi phát nhạc:", e));
+          }
+      } 
+      // Nếu nextTrack === currentTrack, không làm gì cả
+  }
+
+  // Các phần còn lại của loadLevel
+  currentLevelIndex = index;
+  player.lives = player.maxLives; 
+  score = 0;
+  gameWon = true; 
+  parseLevel(index); 
+  resetPlayer(playerStart); 
+  camera.x = 0; 
+  updateUI();
+  levelCompleteScreen.style.display = 'none';
+  achievementScreen.style.display = 'none'; // Đảm bảo ẩn màn hình thành tựu khi tải level mới
+  showLevelIntro(index); 
+  levelSelect.value = index; 
+}
+
+
+// === HÀM winGame ĐÃ SỬA ĐỔI ===
+function winGame(allLevelsComplete) {
+  gameWon = true; 
+  playSound('win');
+  
+  // === SỬA LOGIC KHI HOÀN THÀNH TẤT CẢ ===
+  if (allLevelsComplete) {
+    // Hiển thị màn hình thành tựu thay vì màn hình hoàn thành level thông thường
+    levelCompleteScreen.style.display = 'none'; 
+    achievementScreen.style.display = 'flex'; 
+    replayGameBtn.onclick = loadGame; // Nút chơi lại gọi hàm loadGame
+    
+    // Dừng nhạc nền (nhạc màn cuối)
+    stopAllMusic(); 
+    // Có thể thêm hiệu ứng âm thanh nhỏ khi màn hình thành tựu xuất hiện nếu muốn
+    // playSound('achievement_fanfare'); // Ví dụ
+
+  } else { // Logic khi hoàn thành một level bình thường
+    winTitle.textContent = `Hoàn Thành Ký Ức Tuổi ${currentLevelIndex + 1}!`;
+    winMessage.textContent = "Sẵn sàng cho tuổi tiếp theo?";
+    nextLevelBtn.style.display = 'inline-block';
+    restartBtn.textContent = "Chơi lại Level";
+    restartBtn.onclick = resetCurrentLevel; 
+    levelCompleteScreen.style.display = 'flex'; 
+    achievementScreen.style.display = 'none'; // Đảm bảo màn hình thành tựu bị ẩn
+  }
+  // ======================================
+}
+
+
+// ... (Phần còn lại của JavaScript: update, draw, drawPlayer, loop, Start Game...) ...
 // Game Objects
 let platforms = [], collectibles = [], spikes = [], enemies = [], movingPlatforms = [], springs = [], checkpoints = [];
 let doors = [], keyItems = [], lavas = [], hearts = []; 
@@ -806,6 +921,7 @@ function showStoryIntro() {
   storyScreen.style.display = 'flex';
   levelIntroScreen.style.display = 'none';
   levelCompleteScreen.style.display = 'none';
+  achievementScreen.style.display = 'none'; // Đảm bảo ẩn khi bắt đầu
   startBtn.onclick = () => {
     ensureAudio(); // <<< KÍCH HOẠT ÂM THANH KHI BẤM NÚT BẮT ĐẦU
     storyScreen.style.display = 'none';
@@ -828,7 +944,8 @@ function loadGame() {
   showStoryIntro(); 
 }
 
-// === HÀM loadLevel VỚI LOGIC NHẠC LIỀN MẠCH (ĐÃ SỬA) ===
+
+// === HÀM loadLevel VỚI LOGIC NHẠC LIỀN MẠCH ===
 function loadLevel(index) {
   if (index >= TOTAL_LEVELS) {
     winGame(true); 
@@ -853,6 +970,7 @@ function loadLevel(index) {
           if (currentTrack) {
               currentTrack.volume = 0.3;
               currentTrack.currentTime = 0; // Bắt đầu lại từ đầu khi đổi nhạc
+              // Đảm bảo nhạc lặp lại (do đã thêm 'loop' vào HTML)
               currentTrack.play().catch(e => console.log("Lỗi phát nhạc:", e));
           }
       } 
@@ -869,6 +987,7 @@ function loadLevel(index) {
   camera.x = 0; 
   updateUI();
   levelCompleteScreen.style.display = 'none';
+  achievementScreen.style.display = 'none'; // Đảm bảo ẩn màn hình thành tựu khi tải level mới
   showLevelIntro(index); 
   levelSelect.value = index; 
 }
@@ -1162,7 +1281,14 @@ function update() {
   
   if (goal && score === targetScore && rectOverlap(player, {x:goal.x, y:goal.y, width:TILE_SIZE, height:TILE_SIZE})) { 
     if(!player.hasKey && keyItems.length > 0) { /* Cần chìa khóa nhưng chưa có */ }
-    else { winGame(false); }
+    else { 
+      // Kiểm tra xem có phải level cuối không TRƯỚC khi gọi winGame
+      if (currentLevelIndex === TOTAL_LEVELS - 1) {
+        winGame(true); // Gọi winGame với cờ true cho level cuối
+      } else {
+        winGame(false); // Gọi winGame bình thường
+      }
+    }
   }
 
   // 11. Update objects & camera
@@ -1196,6 +1322,7 @@ function showLevelLostScreen() {
   restartBtn.textContent = "Chơi Lại Level"; 
   restartBtn.onclick = resetCurrentLevel; 
   levelCompleteScreen.style.display = 'flex'; 
+  achievementScreen.style.display = 'none'; // Đảm bảo ẩn khi thua
 }
 
 function rectOverlap(r1, r2) { return r1.x < r2.x + r2.width && r1.x + r1.width > r2.x && r1.y < r2.y + r2.height && r1.y + r1.height > r2.y; }
@@ -1237,24 +1364,35 @@ function resetPlayer(pos) {
   player.jumpBufferTimer = 0;
 }
 
+// === HÀM winGame ĐÃ SỬA ĐỔI ===
 function winGame(allLevelsComplete) {
   gameWon = true; 
   playSound('win');
+  
+  // === SỬA LOGIC KHI HOÀN THÀNH TẤT CẢ ===
   if (allLevelsComplete) {
-    winTitle.textContent = "HOÀN THÀNH!";
-    winMessage.textContent = `Chúc Mừng Sinh Nhật Tuổi 18, Nhiên! 🎂 Bạn đã hoàn thành hành trình ký ức!`;
-    nextLevelBtn.style.display = 'none'; 
-    restartBtn.textContent = "Chơi Lại Từ Đầu"; 
-    restartBtn.onclick = loadGame;
-  } else {
+    // Hiển thị màn hình thành tựu thay vì màn hình hoàn thành level thông thường
+    levelCompleteScreen.style.display = 'none'; 
+    achievementScreen.style.display = 'flex'; 
+    replayGameBtn.onclick = loadGame; // Nút chơi lại gọi hàm loadGame
+    
+    // Dừng nhạc nền (nhạc màn cuối)
+    stopAllMusic(); 
+    // Có thể thêm hiệu ứng âm thanh nhỏ khi màn hình thành tựu xuất hiện nếu muốn
+    // playSound('achievement_fanfare'); // Ví dụ
+
+  } else { // Logic khi hoàn thành một level bình thường
     winTitle.textContent = `Hoàn Thành Ký Ức Tuổi ${currentLevelIndex + 1}!`;
     winMessage.textContent = "Sẵn sàng cho tuổi tiếp theo?";
     nextLevelBtn.style.display = 'inline-block';
     restartBtn.textContent = "Chơi lại Level";
     restartBtn.onclick = resetCurrentLevel; 
+    levelCompleteScreen.style.display = 'flex'; 
+    achievementScreen.style.display = 'none'; // Đảm bảo màn hình thành tựu bị ẩn
   }
-  levelCompleteScreen.style.display = 'flex'; 
+  // ======================================
 }
+
 
 // ======== Draw Function (Giữ nguyên) ========
 function draw() {
