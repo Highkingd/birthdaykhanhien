@@ -197,7 +197,6 @@
   </div>
 
   <audio id="bgMusic" src="retro-8bit-happy-videogame-music-418481.mp3" loop></audio> 
-  
   <audio id="musicCalm" src="flat-8-bit-gaming-music-instrumental-211547.mp3" loop></audio>
   <audio id="musicFinal" src="the-console-of-my-dreams-301289.mp3" loop></audio>
 
@@ -233,8 +232,6 @@ const levelIntroText = document.getElementById('levelIntroText');
 const playLevelBtn = document.getElementById('playLevelBtn');
 const levelSelect = document.getElementById('levelSelect'); 
 const bgMusic = document.getElementById('bgMusic'); 
-
-// === THÊM 2 BIẾN NHẠC MỚI ===
 const musicCalm = document.getElementById('musicCalm'); 
 const musicFinal = document.getElementById('musicFinal'); 
 
@@ -248,22 +245,19 @@ const COLORS = {
 let audioCtx = null;
 let musicStarted = false; 
 
-// === HÀM ensureAudio ĐÃ SỬA ===
 function ensureAudio() { 
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); 
     audioCtx.resume(); 
-    musicStarted = true; // Chỉ cần kích hoạt, loadLevel sẽ xử lý phát nhạc
+    musicStarted = true; 
 }
 
-// === THÊM BIẾN VÀ HÀM QUẢN LÝ NHẠC ===
-let currentTrack = null; // Biến để theo dõi nhạc đang phát
+let currentTrack = null; 
 
 function stopAllMusic() {
     if (currentTrack) {
         currentTrack.pause();
-        currentTrack.currentTime = 0; // Tua về đầu
+        currentTrack.currentTime = 0; 
     }
-    // Đảm bảo tất cả đều tắt (dự phòng)
     bgMusic.pause();
     musicCalm.pause();
     musicFinal.pause();
@@ -852,16 +846,16 @@ function loadLevel(index) {
   showLevelIntro(index); 
   levelSelect.value = index; // Update dropdown
   
-  // === LOGIC PHÁT NHẠC MỚI ===
+  // === LOGIC PHÁT NHẠC MỚI (ĐÃ CHỈNH SỬA) ===
   if (musicStarted) { // Chỉ phát nhạc nếu người dùng đã tương tác
       stopAllMusic(); // Dừng nhạc cũ
 
       if (index === 17) { // Màn 18 (index 17) là màn cuối
           currentTrack = musicFinal;
-      } else if (index >= 9 && index <= 11) { // Màn 10, 11, 12 (Tuổi 10-12)
+      } else if (index >= 0 && index <= 8) { // Màn 1-9 (Tuổi 1-9)
           currentTrack = musicCalm;
-      } else { // Tất cả các màn khác
-          currentTrack = bgMusic;
+      } else { // Màn 10-17 (Tuổi 10-17)
+          currentTrack = bgMusic; // Nhạc retro phát ở giữa
       }
       
       if (currentTrack) {
